@@ -67,8 +67,23 @@ export default function ResultPage({
     submission: Submission;
     exam: Exam;
     userAnswers: Record<string, string>;
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
+  } | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const c = sessionStorage.getItem(`liveexam_cache_result_${submissionId}`);
+        if (c) return JSON.parse(c);
+      } catch {}
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return !sessionStorage.getItem(`liveexam_cache_result_${submissionId}`);
+      } catch {}
+    }
+    return true;
+  });
   const [expandedExplanations, setExpandedExplanations] = useState<Record<number, boolean>>({});
 
   const toggleExplanation = (qid: number) => {
@@ -99,6 +114,9 @@ export default function ResultPage({
         if (!res.ok) throw new Error('Result not found');
         const resData = await res.json();
         setData(resData);
+        try {
+          sessionStorage.setItem(`liveexam_cache_result_${submissionId}`, JSON.stringify(resData));
+        } catch {}
       } catch (e) {
         console.error(e);
       } finally {

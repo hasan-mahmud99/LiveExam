@@ -11,9 +11,26 @@ export interface QuestionFilter {
   offset?: number;
 }
 
+let defaultQuestionsCache: { data?: { questions: Question[]; total: number }; time: number } = { time: 0 };
+const DEFAULT_QUESTIONS_TTL = 3 * 60 * 1000; // 3 minutes
+
 export async function getQuestions(filter: QuestionFilter = {}): Promise<{ questions: Question[]; total: number }> {
   let whereClauses: string[] = [];
   let params: any[] = [];
+
+  const isDefaultQuery = 
+    (!filter.subject || filter.subject === 'all') &&
+    (!filter.exam_type || filter.exam_type === 'all') &&
+    (!filter.grade || filter.grade === 'all') &&
+    (!filter.topic || filter.topic === 'all') &&
+    (!filter.search || !filter.search.trim()) &&
+    (!filter.offset || filter.offset === 0) &&
+    (Number(filter.limit || 50) === 50);
+
+  const now = Date.now();
+  if (isDefaultQuery && defaultQuestionsCache.data && now - defaultQuestionsCache.time < DEFAULT_QUESTIONS_TTL) {
+    return defaultQuestionsCache.data;
+  }
 
   if (filter.subject && filter.subject !== 'all') {
     whereClauses.push('subject = ?');
@@ -51,11 +68,16 @@ export async function getQuestions(filter: QuestionFilter = {}): Promise<{ quest
 
   const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
-  const [countRows] = await pool.query<RowDataPacket[]>(
-    `SELECT COUNT(*) as count FROM questions ${whereSql}`,
-    params
-  );
-  const total = Number(countRows[0]?.count || 0);
+  let total = 0;
+  if (whereClauses.length === 0 && cachedStats?.totalQuestions) {
+    total = cachedStats.totalQuestions;
+  } else {
+    const [countRows] = await pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) as count FROM questions ${whereSql}`,
+      params
+    );
+    total = Number(countRows[0]?.count || 0);
+  }
 
   const limit = Number(filter.limit || 50);
   const offset = Number(filter.offset || 0);
@@ -65,7 +87,13 @@ export async function getQuestions(filter: QuestionFilter = {}): Promise<{ quest
     [...params, limit, offset]
   );
 
-  return { questions: rows as Question[], total };
+  const result = { questions: rows as Question[], total };
+
+  if (isDefaultQuery) {
+    defaultQuestionsCache = { data: result, time: now };
+  }
+
+  return result;
 }
 
 export async function insertQuestionsBatch(questions: Omit<Question, 'id' | 'created_at'>[]): Promise<number> {
@@ -102,6 +130,7 @@ export async function insertQuestionsBatch(questions: Omit<Question, 'id' | 'cre
   `;
 
   const [result] = await pool.query<ResultSetHeader>(sql, values);
+  invalidateQuestionsCache();
   return result.affectedRows;
 }
 
@@ -237,6 +266,13 @@ const EXAMS_CACHE_TTL = 60 * 1000; // 1 minute in-memory cache
 
 export function invalidateExamsCache() {
   examsCache.clear();
+  examByIdCache.clear();
+  cachedStats = null;
+}
+
+export function invalidateQuestionsCache() {
+  defaultQuestionsCache = { time: 0 };
+  topicsCache.clear();
   cachedStats = null;
 }
 
@@ -281,7 +317,16 @@ export async function getExams(filter: { mode?: string; subject?: string } = {})
   return result;
 }
 
+const examByIdCache = new Map<string, { data: any; time: number }>();
+const EXAM_BY_ID_TTL = 3 * 60 * 1000; // 3 minutes
+
 export async function getExamById(id: string): Promise<(Exam & { questions?: Question[] }) | null> {
+  const now = Date.now();
+  const cached = examByIdCache.get(id);
+  if (cached && now - cached.time < EXAM_BY_ID_TTL) {
+    return cached.data;
+  }
+
   const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM exams WHERE id = ?', [id]);
   const exam = rows[0] as any;
   if (!exam) return null;
@@ -302,7 +347,7 @@ export async function getExamById(id: string): Promise<(Exam & { questions?: Que
     questions = ids.map(qid => qMap.get(qid)).filter(Boolean) as Question[];
   }
 
-  return {
+  const result = {
     ...exam,
     duration_minutes: Number(exam.duration_minutes),
     negative_marking: Number(exam.negative_marking),
@@ -310,6 +355,39 @@ export async function getExamById(id: string): Promise<(Exam & { questions?: Que
     total_questions: ids.length,
     questions,
   };
+
+  examByIdCache.set(id, { data: result, time: now });
+  return result;
+}
+
+const topicsCache = new Map<string, { data: any; time: number }>();
+const TOPICS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+export async function getTopics(subject?: string) {
+  const cacheKey = subject || 'all';
+  const now = Date.now();
+  const cached = topicsCache.get(cacheKey);
+  if (cached && now - cached.time < TOPICS_CACHE_TTL) {
+    return cached.data;
+  }
+
+  let sql = `
+    SELECT subject, topic, COUNT(*) as count 
+    FROM questions 
+    WHERE topic IS NOT NULL AND topic != '' 
+  `;
+  const params: any[] = [];
+
+  if (subject && subject !== 'all') {
+    sql += ' AND subject = ?';
+    params.push(subject);
+  }
+
+  sql += ' GROUP BY subject, topic ORDER BY count DESC';
+
+  const [rows] = await pool.query<RowDataPacket[]>(sql, params);
+  topicsCache.set(cacheKey, { data: rows, time: now });
+  return rows;
 }
 
 export async function submitExam(submissionData: {

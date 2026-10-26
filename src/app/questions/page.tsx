@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { 
   Search, 
@@ -41,14 +41,45 @@ interface Question {
 }
 
 export default function QuestionsPage() {
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [questions, setQuestions] = useState<Question[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const c = sessionStorage.getItem('liveexam_cache_questions_default');
+        if (c) return JSON.parse(c);
+      } catch {}
+    }
+    return [];
+  });
+  const [total, setTotal] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const c = sessionStorage.getItem('liveexam_cache_questions_total');
+        if (c) return Number(c);
+      } catch {}
+    }
+    return 0;
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return !sessionStorage.getItem('liveexam_cache_questions_default');
+      } catch {}
+    }
+    return true;
+  });
 
   // Filters
   const [subject, setSubject] = useState('all');
   const [topic, setTopic] = useState('all');
-  const [availableTopics, setAvailableTopics] = useState<{ topic: string; count: number }[]>([]);
+  const [availableTopics, setAvailableTopics] = useState<{ topic: string; count: number }[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const c = sessionStorage.getItem('liveexam_cache_topics_all');
+        if (c) return JSON.parse(c);
+      } catch {}
+    }
+    return [];
+  });
   const [examType, setExamType] = useState('all');
   const [grade, setGrade] = useState('all');
   const [search, setSearch] = useState('');
@@ -60,7 +91,13 @@ export default function QuestionsPage() {
         const url = subject !== 'all' ? `/api/topics?subject=${encodeURIComponent(subject)}` : '/api/topics';
         const res = await fetch(url);
         const data = await res.json();
-        setAvailableTopics(data.topics || []);
+        const tList = data.topics || [];
+        setAvailableTopics(tList);
+        if (subject === 'all') {
+          try {
+            sessionStorage.setItem('liveexam_cache_topics_all', JSON.stringify(tList));
+          } catch {}
+        }
       } catch (err) {
         console.error('Failed to load topics', err);
       }
@@ -76,9 +113,13 @@ export default function QuestionsPage() {
 
   // Expanded explanations state
   const [expandedSolutions, setExpandedSolutions] = useState<Record<number, boolean>>({});
+  const isFirstMount = useRef(true);
 
   const fetchQuestions = async (targetPage = page, targetPageSize = pageSize) => {
-    setLoading(true);
+    // Only show full loading spinner if we don't have questions yet
+    if (questions.length === 0) {
+      setLoading(true);
+    }
     try {
       const offset = (targetPage - 1) * targetPageSize;
       const params = new URLSearchParams();
@@ -92,8 +133,24 @@ export default function QuestionsPage() {
 
       const res = await fetch(`/api/questions?${params.toString()}`);
       const data = await res.json();
-      setQuestions(data.questions || []);
-      setTotal(data.total || 0);
+      const qList = data.questions || [];
+      const qTotal = data.total || 0;
+      setQuestions(qList);
+      setTotal(qTotal);
+
+      if (
+        targetPage === 1 &&
+        subject === 'all' &&
+        topic === 'all' &&
+        examType === 'all' &&
+        grade === 'all' &&
+        !search.trim()
+      ) {
+        try {
+          sessionStorage.setItem('liveexam_cache_questions_default', JSON.stringify(qList));
+          sessionStorage.setItem('liveexam_cache_questions_total', String(qTotal));
+        } catch {}
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -102,11 +159,17 @@ export default function QuestionsPage() {
   };
 
   useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      fetchQuestions(1, pageSize);
+      return;
+    }
     setPage(1);
     fetchQuestions(1, pageSize);
   }, [subject, topic, examType, grade]);
 
   useEffect(() => {
+    if (isFirstMount.current) return;
     fetchQuestions(page, pageSize);
   }, [page, pageSize]);
 

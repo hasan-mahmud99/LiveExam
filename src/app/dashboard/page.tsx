@@ -86,8 +86,24 @@ export default function DashboardPage() {
     }
     return [];
   });
-  const [userSubmissions, setUserSubmissions] = useState<Submission[]>([]);
-  const [examStatusMap, setExamStatusMap] = useState<Record<string, any>>({});
+  const [userSubmissions, setUserSubmissions] = useState<Submission[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const c = sessionStorage.getItem('liveexam_cache_subs');
+        if (c) return JSON.parse(c);
+      } catch {}
+    }
+    return [];
+  });
+  const [examStatusMap, setExamStatusMap] = useState<Record<string, any>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const c = sessionStorage.getItem('liveexam_cache_submap');
+        if (c) return JSON.parse(c);
+      } catch {}
+    }
+    return {};
+  });
   const [loading, setLoading] = useState(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -168,6 +184,10 @@ export default function DashboardPage() {
         try {
           if (sData) sessionStorage.setItem('liveexam_cache_stats', JSON.stringify(sData));
           sessionStorage.setItem('liveexam_cache_exams', JSON.stringify(examList));
+          if (subData) {
+            sessionStorage.setItem('liveexam_cache_subs', JSON.stringify(subData.submissions || []));
+            sessionStorage.setItem('liveexam_cache_submap', JSON.stringify(subData.examMap || {}));
+          }
         } catch {}
       } catch (err) {
         console.error('Failed to load dashboard data:', err);

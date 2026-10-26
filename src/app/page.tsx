@@ -80,7 +80,15 @@ export default function Home() {
   const [selectedSubject, setSelectedSubject] = useState<'all' | 'গণিত' | 'English' | 'সাধারণ জ্ঞান' | 'বাংলা'>('all');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'new' | 'attended'>('all');
   const [search, setSearch] = useState('');
-  const [examStatusMap, setExamStatusMap] = useState<Record<string, any>>({});
+  const [examStatusMap, setExamStatusMap] = useState<Record<string, any>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const c = sessionStorage.getItem('liveexam_cache_submap');
+        if (c) return JSON.parse(c);
+      } catch {}
+    }
+    return {};
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const EXAMS_PER_PAGE = 20;
 
@@ -149,6 +157,9 @@ export default function Home() {
         if (subRes) {
           const subData = await subRes.json();
           setExamStatusMap(subData.examMap || {});
+          try {
+            sessionStorage.setItem('liveexam_cache_submap', JSON.stringify(subData.examMap || {}));
+          } catch {}
         }
       } catch (err) {
         console.error('Failed to load home data:', err);

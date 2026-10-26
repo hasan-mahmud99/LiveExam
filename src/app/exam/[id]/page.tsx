@@ -56,8 +56,23 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
   const { id } = use(params);
   const { user } = useAuth();
 
-  const [exam, setExam] = useState<Exam | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [exam, setExam] = useState<Exam | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const c = sessionStorage.getItem(`liveexam_cache_exam_${id}`);
+        if (c) return JSON.parse(c);
+      } catch {}
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return !sessionStorage.getItem(`liveexam_cache_exam_${id}`);
+      } catch {}
+    }
+    return true;
+  });
   const [userName, setUserName] = useState('');
   const [hasStarted, setHasStarted] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -70,7 +85,18 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
   // Exam state
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [markedForReview, setMarkedForReview] = useState<Record<string, boolean>>({});
-  const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [timeLeft, setTimeLeft] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const c = sessionStorage.getItem(`liveexam_cache_exam_${id}`);
+        if (c) {
+          const parsed = JSON.parse(c);
+          return (Number(parsed.duration_minutes) || 0) * 60;
+        }
+      } catch {}
+    }
+    return 0;
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime, setStartTime] = useState<number>(0);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -112,7 +138,12 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
         if (!res.ok) throw new Error('Exam not found');
         const data = await res.json();
         setExam(data);
-        setTimeLeft(data.duration_minutes * 60);
+        if (!hasStarted) {
+          setTimeLeft(data.duration_minutes * 60);
+        }
+        try {
+          sessionStorage.setItem(`liveexam_cache_exam_${id}`, JSON.stringify(data));
+        } catch {}
       } catch (e) {
         console.error('Failed to load exam:', e);
       } finally {
