@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import FormattedExplanation from '@/components/FormattedExplanation';
 import MathText from '@/components/MathText';
+import FavoriteButton from '@/components/FavoriteButton';
 
 interface Question {
   id: number;
@@ -419,11 +420,14 @@ export default function QuestionsPage() {
                     )}
                   </div>
 
-                  {q.exam_source && (
-                    <span className="text-xs font-semibold text-gray-500 bg-gray-50 px-2.5 py-0.5 rounded-full border border-gray-100">
-                      {q.exam_source}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {q.exam_source && (
+                      <span className="text-xs font-semibold text-gray-500 bg-gray-50 px-2.5 py-0.5 rounded-full border border-gray-100 hidden sm:inline">
+                        {q.exam_source}
+                      </span>
+                    )}
+                    <FavoriteButton question={q} size="sm" showLabel={true} />
+                  </div>
                 </div>
 
                 {/* Question */}

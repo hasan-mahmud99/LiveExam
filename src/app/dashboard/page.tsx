@@ -81,6 +81,33 @@ export default function DashboardPage() {
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'new' | 'attended'>('all');
   const [search, setSearch] = useState('');
 
+  // Restore filters from sessionStorage
+  useEffect(() => {
+    try {
+      const g = sessionStorage.getItem('liveexam_filter_grade');
+      if (g) setSelectedGrade(g as any);
+      const s = sessionStorage.getItem('liveexam_filter_subject');
+      if (s) setSelectedSubject(s as any);
+      const st = sessionStorage.getItem('liveexam_filter_status');
+      if (st) setSelectedStatus(st as any);
+    } catch {}
+  }, []);
+
+  const handleGradeChange = (val: 'all' | '10-13' | '13-16' | 'bcs') => {
+    setSelectedGrade(val);
+    try { sessionStorage.setItem('liveexam_filter_grade', val); } catch {}
+  };
+
+  const handleSubjectChange = (val: 'all' | 'গণিত' | 'English' | 'সাধারণ জ্ঞান' | 'বাংলা') => {
+    setSelectedSubject(val);
+    try { sessionStorage.setItem('liveexam_filter_subject', val); } catch {}
+  };
+
+  const handleStatusChange = (val: 'all' | 'new' | 'attended') => {
+    setSelectedStatus(val);
+    try { sessionStorage.setItem('liveexam_filter_status', val); } catch {}
+  };
+
   // Pagination State - Max 20 exams per page
   const [currentPage, setCurrentPage] = useState(1);
   const EXAMS_PER_PAGE = 20;
@@ -385,7 +412,7 @@ export default function DashboardPage() {
                   <button
                     key={g.id}
                     type="button"
-                    onClick={() => setSelectedGrade(g.id as any)}
+                    onClick={() => handleGradeChange(g.id as any)}
                     className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition active:scale-95 ${
                       selectedGrade === g.id
                         ? 'bg-emerald-600 text-white shadow-xs'
@@ -414,7 +441,7 @@ export default function DashboardPage() {
                   <button
                     key={s.id}
                     type="button"
-                    onClick={() => setSelectedSubject(s.id as any)}
+                    onClick={() => handleSubjectChange(s.id as any)}
                     className={`px-3 py-1 rounded-lg font-semibold whitespace-nowrap transition active:scale-95 text-xs ${
                       selectedSubject === s.id
                         ? 'bg-teal-700 text-white shadow-xs'
@@ -435,7 +462,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-1.5 text-xs">
                 <button
                   type="button"
-                  onClick={() => setSelectedStatus('all')}
+                  onClick={() => handleStatusChange('all')}
                   className={`px-3 py-1 rounded-lg font-bold transition ${
                     selectedStatus === 'all'
                       ? 'bg-gray-900 text-white'
@@ -446,7 +473,7 @@ export default function DashboardPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedStatus('new')}
+                  onClick={() => handleStatusChange('new')}
                   className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1 ${
                     selectedStatus === 'new'
                       ? 'bg-blue-600 text-white shadow-xs'
@@ -457,7 +484,7 @@ export default function DashboardPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedStatus('attended')}
+                  onClick={() => handleStatusChange('attended')}
                   className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1 ${
                     selectedStatus === 'attended'
                       ? 'bg-emerald-600 text-white shadow-xs'

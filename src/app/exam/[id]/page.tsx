@@ -15,9 +15,14 @@ import {
   Sparkles,
   HelpCircle,
   ArrowDownCircle,
-  FileCheck2
+  FileCheck2,
+  Lock,
+  Unlock,
+  Sliders,
+  Edit2
 } from 'lucide-react';
 import MathText from '@/components/MathText';
+import FavoriteButton from '@/components/FavoriteButton';
 import { useAuth } from '@/context/AuthContext';
 
 interface Question {
@@ -56,6 +61,11 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
   const [userName, setUserName] = useState('');
   const [hasStarted, setHasStarted] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const [isEditingName, setIsEditingName] = useState(false);
+
+  // Practice exam custom settings
+  const [enableNegativeMarking, setEnableNegativeMarking] = useState<boolean>(true);
+  const [allowAnswerChange, setAllowAnswerChange] = useState<boolean>(true);
 
   // Exam state
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -127,9 +137,18 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
   };
 
   const handleOptionSelect = (questionId: number, option: string) => {
+    const qStr = questionId.toString();
+    const current = answers[qStr];
+    const isLockedMode = exam?.mode === 'live' || !allowAnswerChange;
+
+    if (isLockedMode && current && current !== '') {
+      // Locked: cannot change answer once chosen
+      return;
+    }
+
     setAnswers((prev) => ({
       ...prev,
-      [questionId.toString()]: prev[questionId.toString()] === option ? '' : option
+      [qStr]: prev[qStr] === option ? (isLockedMode ? option : '') : option
     }));
   };
 
@@ -156,7 +175,8 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
         body: JSON.stringify({
           user_name: userName || user?.display_name || 'পরীক্ষার্থী',
           time_taken_seconds: timeTaken,
-          answers
+          answers,
+          allow_negative: exam?.mode === 'practice' ? enableNegativeMarking : true
         })
       });
 
@@ -268,26 +288,149 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
           </div>
 
           <form onSubmit={handleStartExam} className="space-y-4 pt-1">
-            <div>
-              <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-1">
-                আপনার নাম (লিডারবোর্ডে প্রদর্শনের জন্য):
-              </label>
-              <div className="relative">
-                <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  required
-                  placeholder="যেমন: কণা / হাসান / সাকিব"
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-300 font-semibold text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
-                />
+            {/* Candidate Name Card */}
+            {(userName || user?.display_name) && !isEditingName ? (
+              <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-3.5 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shadow-inner">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-500 font-bold block leading-tight">পরীক্ষার্থী:</span>
+                    <span className="text-sm font-extrabold text-gray-900">{userName || user?.display_name}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingName(true)}
+                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1 bg-white border border-emerald-200 px-2.5 py-1 rounded-lg"
+                >
+                  <Edit2 className="w-3 h-3" />
+                  <span>নাম পরিবর্তন</span>
+                </button>
               </div>
-            </div>
+            ) : (
+              <div>
+                <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-1">
+                  আপনার নাম (লিডারবোর্ড ও ফলাফলের জন্য):
+                </label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="যেমন: কণা / হাসান / সাকিব"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-300 font-semibold text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Practice Exam Customizable Options */}
+            {exam.mode === 'practice' ? (
+              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 space-y-3.5">
+                <div className="flex items-center gap-2 text-xs font-black text-gray-800">
+                  <Sliders className="w-4 h-4 text-emerald-600" />
+                  <span>অনুশীলন টেস্ট কাস্টমাইজেশন:</span>
+                </div>
+
+                {/* Negative marking option */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold text-gray-600 block">১. নেগেটিভ মার্কিং নির্বাচন:</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEnableNegativeMarking(true)}
+                      className={`p-2.5 rounded-xl text-xs font-bold border text-left transition ${
+                        enableNegativeMarking
+                          ? 'bg-emerald-50 border-emerald-500 text-emerald-950 ring-1 ring-emerald-400'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${enableNegativeMarking ? 'border-emerald-600' : 'border-gray-400'}`}>
+                          {enableNegativeMarking && <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />}
+                        </span>
+                        <span>চালু (-{exam.negative_marking})</span>
+                      </div>
+                      <span className="text-[10px] text-gray-500 block pl-5 font-normal">আসল পরীক্ষার মতো মার্ক কাটা</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setEnableNegativeMarking(false)}
+                      className={`p-2.5 rounded-xl text-xs font-bold border text-left transition ${
+                        !enableNegativeMarking
+                          ? 'bg-emerald-50 border-emerald-500 text-emerald-950 ring-1 ring-emerald-400'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${!enableNegativeMarking ? 'border-emerald-600' : 'border-gray-400'}`}>
+                          {!enableNegativeMarking && <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />}
+                        </span>
+                        <span>বন্ধ (0.00)</span>
+                      </div>
+                      <span className="text-[10px] text-gray-500 block pl-5 font-normal">ভুলে কোনো নম্বর কাটা যাবে না</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Answer re-selection option */}
+                <div className="space-y-1.5 pt-1 border-t border-gray-200/60">
+                  <span className="text-[11px] font-bold text-gray-600 block">২. উত্তর পরিবর্তন সুবিধা:</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAllowAnswerChange(true)}
+                      className={`p-2.5 rounded-xl text-xs font-bold border text-left transition ${
+                        allowAnswerChange
+                          ? 'bg-emerald-50 border-emerald-500 text-emerald-950 ring-1 ring-emerald-400'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Unlock className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>পরিবর্তনযোগ্য</span>
+                      </div>
+                      <span className="text-[10px] text-gray-500 block pl-5 font-normal">অন্য অপশনে ক্লিক করে উত্তর বদলাতে পারবেন</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setAllowAnswerChange(false)}
+                      className={`p-2.5 rounded-xl text-xs font-bold border text-left transition ${
+                        !allowAnswerChange
+                          ? 'bg-emerald-50 border-emerald-500 text-emerald-950 ring-1 ring-emerald-400'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-rose-600" />
+                        <span>এক ক্লিকে লক</span>
+                      </div>
+                      <span className="text-[10px] text-gray-500 block pl-5 font-normal">একবার সিলেক্ট করলে আর পরিবর্তন হবে না</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-900 space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-rose-950">
+                  <Lock className="w-4 h-4 text-rose-600" />
+                  <span>লাইভ পরীক্ষা নিয়মাবলি:</span>
+                </div>
+                <p className="text-[11px] text-rose-800">
+                  এটি একটি লাইভ পরীক্ষা। এতে নেগেটিভ মার্কিং (-{exam.negative_marking}) এবং এক ক্লিকে উত্তর লক নীতি অপরিবর্তনীয়।
+                </p>
+              </div>
+            )}
 
             <button
               type="submit"
-              className="w-full py-3 sm:py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-sm sm:text-base shadow-md transition active:scale-98 flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-sm sm:text-base shadow-md transition active:scale-98 flex items-center justify-center gap-2"
             >
               পরীক্ষা শুরু করুন
               <ChevronRight className="w-4 h-4" />
@@ -412,19 +555,22 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
                   )}
                 </div>
 
-                {/* Bookmark / Review Button */}
-                <button
-                  type="button"
-                  onClick={() => toggleReviewMark(q.id)}
-                  className={`text-[11px] px-2.5 py-1 rounded-lg flex items-center gap-1 font-semibold transition active:scale-95 ${
-                    isMarked
-                      ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                      : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  <Bookmark className={`w-3.5 h-3.5 ${isMarked ? 'fill-amber-600 text-amber-600' : ''}`} />
-                  <span>{isMarked ? 'রিভিউ মার্কড' : 'রিভিউ'}</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <FavoriteButton question={q} size="sm" showLabel={false} />
+                  {/* Bookmark / Review Button */}
+                  <button
+                    type="button"
+                    onClick={() => toggleReviewMark(q.id)}
+                    className={`text-[11px] px-2.5 py-1 rounded-lg flex items-center gap-1 font-semibold transition active:scale-95 ${
+                      isMarked
+                        ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                        : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Bookmark className={`w-3.5 h-3.5 ${isMarked ? 'fill-amber-600 text-amber-600' : ''}`} />
+                    <span>{isMarked ? 'রিভিউ মার্কড' : 'রিভিউ'}</span>
+                  </button>
+                </div>
               </div>
 
               {/* Question Text with MathText formatting */}
@@ -441,21 +587,28 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
                   { label: 'ঘ', key: 'D', text: q.option_d },
                 ].map((opt) => {
                   const isSelected = currentSelected === opt.key;
+                  const isLockedOther = Boolean((exam.mode === 'live' || !allowAnswerChange) && currentSelected && !isSelected);
+
                   return (
                     <button
                       key={opt.key}
                       type="button"
+                      disabled={isLockedOther}
                       onClick={() => handleOptionSelect(q.id, opt.key)}
-                      className={`w-full text-left p-3 sm:p-3.5 rounded-xl border flex items-center gap-3 transition-all min-h-[48px] active:scale-[0.99] ${
+                      className={`w-full text-left p-3 sm:p-3.5 rounded-xl border flex items-center gap-3 transition-all min-h-[48px] ${
                         isSelected
                           ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-semibold shadow-xs ring-1 ring-emerald-500'
-                          : 'bg-white border-gray-200 text-gray-800 hover:border-gray-300 hover:bg-gray-50/70'
+                          : isLockedOther
+                          ? 'bg-gray-50 border-gray-150 text-gray-400 cursor-not-allowed opacity-60'
+                          : 'bg-white border-gray-200 text-gray-800 hover:border-gray-300 hover:bg-gray-50/70 active:scale-[0.99]'
                       }`}
                     >
                       <span
                         className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
                           isSelected
                             ? 'bg-emerald-600 text-white shadow-xs'
+                            : isLockedOther
+                            ? 'bg-gray-200 text-gray-400'
                             : 'bg-gray-100 text-gray-600 border border-gray-200'
                         }`}
                       >
@@ -464,13 +617,18 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
                       <span className="text-xs sm:text-sm leading-snug flex-1 break-words font-medium">
                         <MathText text={opt.text} />
                       </span>
+                      {isSelected && (exam.mode === 'live' || !allowAnswerChange) && (
+                        <span className="text-[10px] text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded font-bold shrink-0">
+                          লকড
+                        </span>
+                      )}
                     </button>
                   );
                 })}
               </div>
 
-              {/* Reset/Clear Choice */}
-              {currentSelected && (
+              {/* Reset/Clear Choice (Only allowed when answer change is enabled) */}
+              {currentSelected && allowAnswerChange && exam.mode !== 'live' && (
                 <div className="mt-2 text-right">
                   <button
                     type="button"

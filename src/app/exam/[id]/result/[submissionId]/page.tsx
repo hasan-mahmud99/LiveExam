@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import FormattedExplanation from '@/components/FormattedExplanation';
 import MathText from '@/components/MathText';
+import FavoriteButton from '@/components/FavoriteButton';
 
 interface Submission {
   id: string;
@@ -147,21 +148,39 @@ export default function ResultPage({
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
       {/* Top Banner & Quick Navigation */}
-      <div className="flex items-center justify-between">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 bg-white border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          হোমে ফিরে যান
-        </Link>
-        <Link
-          href={`/exam/${id}/leaderboard`}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-3.5 py-1.5 rounded-lg shadow-sm"
-        >
-          <Trophy className="w-3.5 h-3.5 text-amber-600" />
-          গ্রুপ লিডারবোর্ড দেখুন
-        </Link>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 bg-white border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            হোমে ফিরে যান
+          </Link>
+          <Link
+            href="/practice"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg shadow-sm"
+          >
+            অনুশীলন তালিকা
+          </Link>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/exam/${id}?retake=true`}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
+            আবার দিন
+          </Link>
+          <Link
+            href={`/exam/${id}/leaderboard`}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-3.5 py-1.5 rounded-lg shadow-sm"
+          >
+            <Trophy className="w-3.5 h-3.5 text-amber-600" />
+            গ্রুপ লিডারবোর্ড
+          </Link>
+        </div>
       </div>
 
       {/* Main Score Card */}
@@ -283,7 +302,8 @@ export default function ResultPage({
                     )}
                   </div>
 
-                  <div>
+                  <div className="flex items-center gap-2">
+                    <FavoriteButton question={q} size="sm" showLabel={false} />
                     {isSkipped ? (
                       <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">
                         উত্তর দেননি

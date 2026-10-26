@@ -1,5 +1,22 @@
+const fs = require('fs');
+const path = require('path');
 const readline = require('readline');
 const mysql = require('mysql2/promise');
+
+function getStoredPassword() {
+  if (process.env.TIDB_PASSWORD) return process.env.TIDB_PASSWORD;
+  const envPath = path.join(__dirname, '..', '.env.local');
+  if (fs.existsSync(envPath)) {
+    const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
+    for (const line of lines) {
+      const match = line.match(/^\s*TIDB_PASSWORD\s*=\s*(.*)\s*$/);
+      if (match) {
+        return match[1].trim().replace(/^["']|["']$/g, '');
+      }
+    }
+  }
+  return null;
+}
 
 async function askPassword() {
   const rl = readline.createInterface({
@@ -16,7 +33,7 @@ async function askPassword() {
 }
 
 async function main() {
-  const cloudPassword = process.argv[2] || process.env.TIDB_PASSWORD || (await askPassword());
+  const cloudPassword = process.argv[2] || getStoredPassword() || (await askPassword());
 
   if (!cloudPassword) {
     console.error('Error: TiDB password cannot be empty.');

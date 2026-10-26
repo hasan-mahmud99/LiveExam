@@ -24,7 +24,8 @@ export async function POST(
       user_name: body.user_name,
       user_id: userId,
       time_taken_seconds: body.time_taken_seconds || 0,
-      answers: body.answers || {}
+      answers: body.answers || {},
+      allow_negative: body.allow_negative
     });
 
     return NextResponse.json(result);

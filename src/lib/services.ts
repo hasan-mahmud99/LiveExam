@@ -285,6 +285,7 @@ export async function submitExam(submissionData: {
   user_id?: number | null;
   time_taken_seconds: number;
   answers: Record<string, string>;
+  allow_negative?: boolean;
 }) {
   const exam = await getExamById(submissionData.exam_id);
   if (!exam || !exam.questions) {
@@ -307,7 +308,8 @@ export async function submitExam(submissionData: {
   }
 
   const marksPerQ = Number(exam.marks_per_question);
-  const negMark = Number(exam.negative_marking);
+  const isPractice = exam.mode === 'practice';
+  const negMark = isPractice && submissionData.allow_negative === false ? 0 : Number(exam.negative_marking);
   const positiveMarks = correctCount * marksPerQ;
   const negativeDeduction = wrongCount * negMark;
   const netScore = Math.max(0, Number((positiveMarks - negativeDeduction).toFixed(2)));
