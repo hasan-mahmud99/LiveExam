@@ -47,9 +47,13 @@ export default function FavoritesPage() {
     setRevealedAnswers((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // Toggle explanation
+  // Toggle explanation - also automatically reveals the correct answer
   const toggleExplanation = (id: number) => {
-    setExpandedExplanations((prev) => ({ ...prev, [id]: !prev[id] }));
+    const nextState = !expandedExplanations[id];
+    setExpandedExplanations((prev) => ({ ...prev, [id]: nextState }));
+    if (nextState) {
+      setRevealedAnswers((prev) => ({ ...prev, [id]: true }));
+    }
   };
 
   // Filter questions
@@ -319,10 +323,11 @@ export default function FavoritesPage() {
                       return (
                         <div
                           key={optKey}
-                          className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition ${
+                          onClick={() => setRevealedAnswers((prev) => ({ ...prev, [q.id]: true }))}
+                          className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition cursor-pointer ${
                             isAnswerRevealed && isCorrect
-                              ? 'bg-emerald-50 border-emerald-400 text-emerald-950 font-bold'
-                              : 'bg-gray-50 border-gray-200 text-gray-700'
+                              ? 'bg-emerald-50 border-emerald-400 text-emerald-950 font-bold ring-1 ring-emerald-300'
+                              : 'bg-gray-50 border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-100/60'
                           }`}
                         >
                           <span
