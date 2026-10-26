@@ -59,7 +59,15 @@ export default function LoginPage() {
 
     const res = await login(username.trim(), password.trim(), rememberMe);
     if (res.success) {
-      router.push('/dashboard');
+      let target = '/dashboard';
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const redir = params.get('redirect');
+        if (redir && redir.startsWith('/')) {
+          target = redir;
+        }
+      }
+      window.location.href = target;
     } else {
       setError(res.error || 'ভুল ইউজারনেম অথবা পাসওয়ার্ড');
       setIsSubmitting(false);

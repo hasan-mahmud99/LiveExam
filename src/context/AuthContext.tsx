@@ -52,12 +52,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             localStorage.setItem('liveexam_user_name', data.user.display_name);
             localStorage.setItem('liveexam_user_role', data.user.role);
           } else {
-            // Only clear if localStorage didn't specify remember
-            const remembered = localStorage.getItem('liveexam_remember');
-            if (!remembered) {
-              setUser(null);
-              localStorage.removeItem('liveexam_auth_user');
-            }
+            setUser(null);
+            localStorage.removeItem('liveexam_auth_user');
+            localStorage.removeItem('liveexam_user_name');
+            localStorage.removeItem('liveexam_user_role');
           }
         }
       } catch (err) {
