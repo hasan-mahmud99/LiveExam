@@ -90,6 +90,22 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
       }
     }
 
+    // Check if this exam was already completed in this session and user is not retaking
+    const isRetake = typeof window !== 'undefined' && window.location.search.includes('retake=true');
+    if (isRetake) {
+      try {
+        sessionStorage.removeItem(`liveexam_submitted_${id}`);
+      } catch {}
+    } else {
+      try {
+        const prevSubId = sessionStorage.getItem(`liveexam_submitted_${id}`);
+        if (prevSubId) {
+          router.replace(`/exam/${id}/result/${prevSubId}`);
+          return;
+        }
+      } catch {}
+    }
+
     async function fetchExam() {
       try {
         const res = await fetch(`/api/exams/${id}`);
@@ -182,7 +198,11 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
 
       const result = await res.json();
       if (result.submission_id) {
-        router.push(`/exam/${id}/result/${result.submission_id}`);
+        try {
+          sessionStorage.setItem(`liveexam_submitted_${id}`, result.submission_id);
+        } catch {}
+        // Replace current history entry so hitting "Back" from result page doesn't return to the exam screen
+        router.replace(`/exam/${id}/result/${result.submission_id}`);
       } else {
         alert('ফলাফল তৈরি করতে সমস্যা হয়েছে');
         setIsSubmitting(false);
