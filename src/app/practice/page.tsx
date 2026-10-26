@@ -38,8 +38,23 @@ function PracticeContent() {
   const catParam = searchParams.get('category');
   const { user } = useAuth();
 
-  const [exams, setExams] = useState<Exam[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [exams, setExams] = useState<Exam[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const c = sessionStorage.getItem('liveexam_cache_exams_practice');
+        if (c) return JSON.parse(c);
+      } catch {}
+    }
+    return [];
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return !sessionStorage.getItem('liveexam_cache_exams_practice');
+      } catch {}
+    }
+    return true;
+  });
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedGrade, setSelectedGrade] = useState<'all' | '10-13' | '13-16' | 'bcs'>('all');
   const [selectedSubject, setSelectedSubject] = useState<'all' | 'গণিত' | 'English' | 'সাধারণ জ্ঞান' | 'বাংলা'>('all');
@@ -110,7 +125,11 @@ function PracticeContent() {
 
         const [res, subRes] = await Promise.all(fetches);
         const data = await res.json();
-        setExams(Array.isArray(data) ? data : []);
+        const examList = Array.isArray(data) ? data : [];
+        setExams(examList);
+        try {
+          sessionStorage.setItem('liveexam_cache_exams_practice', JSON.stringify(examList));
+        } catch {}
 
         if (subRes) {
           const subData = await subRes.json();

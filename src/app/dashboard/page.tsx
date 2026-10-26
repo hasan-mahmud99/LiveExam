@@ -68,11 +68,34 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, isAdmin, loading: authLoading } = useAuth();
 
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [exams, setExams] = useState<Exam[]>([]);
+  const [stats, setStats] = useState<Stats | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const c = sessionStorage.getItem('liveexam_cache_stats');
+        if (c) return JSON.parse(c);
+      } catch {}
+    }
+    return null;
+  });
+  const [exams, setExams] = useState<Exam[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const c = sessionStorage.getItem('liveexam_cache_exams');
+        if (c) return JSON.parse(c);
+      } catch {}
+    }
+    return [];
+  });
   const [userSubmissions, setUserSubmissions] = useState<Submission[]>([]);
   const [examStatusMap, setExamStatusMap] = useState<Record<string, any>>({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return !sessionStorage.getItem('liveexam_cache_exams');
+      } catch {}
+    }
+    return true;
+  });
 
   // Filter States
   const [mainTab, setMainTab] = useState<'all' | 'history'>('all');
@@ -137,9 +160,15 @@ export default function DashboardPage() {
         const subData = await subRes.json();
 
         setStats(sData);
-        setExams(Array.isArray(eData) ? eData : []);
+        const examList = Array.isArray(eData) ? eData : [];
+        setExams(examList);
         setUserSubmissions(subData.submissions || []);
         setExamStatusMap(subData.examMap || {});
+
+        try {
+          if (sData) sessionStorage.setItem('liveexam_cache_stats', JSON.stringify(sData));
+          sessionStorage.setItem('liveexam_cache_exams', JSON.stringify(examList));
+        } catch {}
       } catch (err) {
         console.error('Failed to load dashboard data:', err);
       } finally {

@@ -49,9 +49,32 @@ interface Stats {
 
 export default function Home() {
   const { user, isAdmin } = useAuth();
-  const [exams, setExams] = useState<Exam[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [exams, setExams] = useState<Exam[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const c = sessionStorage.getItem('liveexam_cache_exams');
+        if (c) return JSON.parse(c);
+      } catch {}
+    }
+    return [];
+  });
+  const [stats, setStats] = useState<Stats | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const c = sessionStorage.getItem('liveexam_cache_stats');
+        if (c) return JSON.parse(c);
+      } catch {}
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return !sessionStorage.getItem('liveexam_cache_exams');
+      } catch {}
+    }
+    return true;
+  });
   const [activeTab, setActiveTab] = useState<'all' | 'live' | 'practice'>('all');
   const [selectedGrade, setSelectedGrade] = useState<'all' | '10-13' | '13-16' | 'bcs'>('all');
   const [selectedSubject, setSelectedSubject] = useState<'all' | 'গণিত' | 'English' | 'সাধারণ জ্ঞান' | 'বাংলা'>('all');
@@ -114,8 +137,14 @@ export default function Home() {
         const examsData = await examsRes.json();
         const statsData = await statsRes.json();
 
-        setExams(Array.isArray(examsData) ? examsData : []);
+        const examsList = Array.isArray(examsData) ? examsData : [];
+        setExams(examsList);
         setStats(statsData);
+
+        try {
+          sessionStorage.setItem('liveexam_cache_exams', JSON.stringify(examsList));
+          if (statsData) sessionStorage.setItem('liveexam_cache_stats', JSON.stringify(statsData));
+        } catch {}
 
         if (subRes) {
           const subData = await subRes.json();

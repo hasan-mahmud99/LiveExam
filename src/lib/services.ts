@@ -105,7 +105,17 @@ export async function insertQuestionsBatch(questions: Omit<Question, 'id' | 'cre
   return result.affectedRows;
 }
 
+// Server-side In-Memory Caching for Blazing Fast Instant Responses
+let cachedStats: any = null;
+let lastStatsFetchTime = 0;
+const STATS_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+
 export async function getStats() {
+  const now = Date.now();
+  if (cachedStats && now - lastStatsFetchTime < STATS_CACHE_TTL) {
+    return cachedStats;
+  }
+
   const [totalQ] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as c FROM questions');
   const [totalE] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as c FROM exams');
   const [totalS] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as c FROM submissions');
@@ -120,7 +130,7 @@ export async function getStats() {
     'SELECT grade, COUNT(*) as count FROM questions GROUP BY grade ORDER BY count DESC'
   );
 
-  return {
+  const stats = {
     totalQuestions: Number(totalQ[0]?.c || 0),
     totalExams: Number(totalE[0]?.c || 0),
     totalSubmissions: Number(totalS[0]?.c || 0),
@@ -128,6 +138,10 @@ export async function getStats() {
     examTypes: examTypes as { exam_type: string; count: number }[],
     grades: grades as { grade: string; count: number }[],
   };
+
+  cachedStats = stats;
+  lastStatsFetchTime = now;
+  return stats;
 }
 
 export async function createExam(data: {
@@ -214,10 +228,26 @@ export async function createExam(data: {
   );
 
   const created = await getExamById(id);
+  invalidateExamsCache();
   return created!;
 }
 
+const examsCache: Map<string, { data: Exam[]; time: number }> = new Map();
+const EXAMS_CACHE_TTL = 60 * 1000; // 1 minute in-memory cache
+
+export function invalidateExamsCache() {
+  examsCache.clear();
+  cachedStats = null;
+}
+
 export async function getExams(filter: { mode?: string; subject?: string } = {}): Promise<Exam[]> {
+  const cacheKey = `${filter.mode || 'all'}_${filter.subject || 'all'}`;
+  const now = Date.now();
+  const cached = examsCache.get(cacheKey);
+  if (cached && now - cached.time < EXAMS_CACHE_TTL) {
+    return cached.data;
+  }
+
   let whereClauses: string[] = [];
   let params: any[] = [];
 
@@ -233,7 +263,7 @@ export async function getExams(filter: { mode?: string; subject?: string } = {})
 
   const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
   const [rows] = await pool.query<RowDataPacket[]>(`SELECT * FROM exams ${whereSql} ORDER BY created_at DESC`, params);
-  return rows.map((row: any) => {
+  const result: Exam[] = rows.map((row: any) => {
     let ids: number[] = [];
     try {
       ids = typeof row.question_ids === 'string' ? JSON.parse(row.question_ids) : row.question_ids;
@@ -246,6 +276,9 @@ export async function getExams(filter: { mode?: string; subject?: string } = {})
       total_questions: Array.isArray(ids) ? ids.length : 0,
     };
   });
+
+  examsCache.set(cacheKey, { data: result, time: now });
+  return result;
 }
 
 export async function getExamById(id: string): Promise<(Exam & { questions?: Question[] }) | null> {
